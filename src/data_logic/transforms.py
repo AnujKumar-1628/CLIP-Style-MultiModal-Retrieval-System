@@ -17,7 +17,6 @@ from torchvision.transforms import InterpolationMode
 from src.utils.config import DataConfig, load_data_config
 from src.utils.logger import setup_logger
 
-
 LOGGER = setup_logger(
     name="data_transforms",
     level="INFO",
@@ -50,7 +49,9 @@ def _to_interpolation_mode(value: str) -> InterpolationMode:
             value,
             supported,
         )
-        raise ValueError(f"Unsupported interpolation '{value}'. Supported values: {supported}")
+        raise ValueError(
+            f"Unsupported interpolation '{value}'. Supported values: {supported}"
+        )
     return mapping[key]
 
 
@@ -82,7 +83,7 @@ def build_train_image_transform(
 
     Default behavior:
     - Always convert to RGB
-    - If `use_augmentations=True`: random resized crop + horizontal flip
+    - If `use_augmentations=True`: stronger CLIP-style augmentation recipe
     - Else: deterministic resize + center crop
     - Normalize with config mean/std (ImageNet by default)
     """
@@ -97,11 +98,31 @@ def build_train_image_transform(
             [
                 transforms.RandomResizedCrop(
                     size=size,
-                    scale=(0.8, 1.0),
+                    scale=(0.7, 1.0),
                     ratio=(0.75, 1.3333),
                     interpolation=interpolation,
                 ),
-                transforms.RandomHorizontalFlip(p=0.5),
+                transforms.RandomHorizontalFlip(p=0.0),
+                transforms.RandomApply(
+                    [
+                        transforms.ColorJitter(
+                            brightness=0.3,
+                            contrast=0.3,
+                            saturation=0.3,
+                            hue=0.08,
+                        )
+                    ],
+                    p=0.7,
+                ),
+                transforms.RandomApply(
+                    [
+                        transforms.GaussianBlur(
+                            kernel_size=23,
+                            sigma=(0.1, 2.0),
+                        )
+                    ],
+                    p=0.2,
+                ),
             ]
         )
     else:
@@ -133,7 +154,9 @@ def build_train_image_transform(
     return transform
 
 
-def build_eval_image_transform(data_cfg: DataConfig | None = None) -> transforms.Compose:
+def build_eval_image_transform(
+    data_cfg: DataConfig | None = None,
+) -> transforms.Compose:
     """
     Build deterministic validation/test transform.
     """
@@ -187,7 +210,9 @@ def get_transform_bundle(
     """
     cfg = get_data_config(config_path)
     bundle = {
-        "train_image": build_train_image_transform(cfg, use_augmentations=use_train_augmentations),
+        "train_image": build_train_image_transform(
+            cfg, use_augmentations=use_train_augmentations
+        ),
         "eval_image": build_eval_image_transform(cfg),
         "text": build_text_preprocessor(cfg),
     }

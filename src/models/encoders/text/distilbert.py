@@ -8,6 +8,7 @@ Design goals:
 
 from __future__ import annotations
 
+import hashlib
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -41,7 +42,7 @@ class _SimpleWhitespaceTokenizer:
 
     This tokenizer is intentionally simple and deterministic:
     - split on whitespace
-    - map token to id via stable hash mod vocab size
+    - map token to id via SHA-1 digest mod vocab size
     - reserve 0 for PAD and 1 for UNK
     """
 
@@ -55,7 +56,9 @@ class _SimpleWhitespaceTokenizer:
         if not token:
             return self.unk_token_id
         usable = max(2, self.vocab_size - 2)
-        return 2 + (abs(hash(token)) % usable)
+        digest = hashlib.sha1(token.encode("utf-8")).digest()
+        value = int.from_bytes(digest[:8], byteorder="big", signed=False)
+        return 2 + (value % usable)
 
     def __call__(
         self,
@@ -124,6 +127,8 @@ class DistilBertEncoderConfig:
     device: str
     dtype: str
     normalize_output: bool
+    allow_random_init_fallback: bool
+    allow_simple_tokenizer_fallback: bool
 
 
 def _parse_freeze_until_layer(value: str | None) -> int | None:
@@ -192,6 +197,12 @@ def load_distilbert_encoder_config(
         device=str(model_section.get("device", "cpu")),
         dtype=str(model_section.get("dtype", "float32")),
         normalize_output=bool(text_raw.get("normalize_output", False)),
+        allow_random_init_fallback=bool(
+            text_raw.get("allow_random_init_fallback", False)
+        ),
+        allow_simple_tokenizer_fallback=bool(
+            text_raw.get("allow_simple_tokenizer_fallback", False)
+        ),
     )
     return cfg
 
@@ -239,7 +250,8 @@ class DistilBertTextEncoder(nn.Module):
         LOGGER.info(
             "Initialized DistilBertTextEncoder | device=%s dtype=%s pretrained=%s "
             "architecture=%s trainable=%s freeze_backbone=%s freeze_until=%s "
-            "normalize_output=%s max_length=%d dynamic_padding=%s",
+            "normalize_output=%s max_length=%d dynamic_padding=%s "
+            "allow_random_init_fallback=%s allow_simple_tokenizer_fallback=%s",
             self.device_obj,
             self.dtype_obj,
             self.config.pretrained,
@@ -250,6 +262,8 @@ class DistilBertTextEncoder(nn.Module):
             self.config.normalize_output,
             self.max_length,
             self.dynamic_padding,
+            self.config.allow_random_init_fallback,
+            self.config.allow_simple_tokenizer_fallback,
         )
 
     def _build_tokenizer(self, architecture: str) -> PreTrainedTokenizerBase | _SimpleWhitespaceTokenizer:
@@ -264,9 +278,17 @@ class DistilBertTextEncoder(nn.Module):
             try:
                 return AutoTokenizer.from_pretrained(architecture, use_fast=False)
             except Exception as inner_exc:
+                if not self.config.allow_simple_tokenizer_fallback:
+                    raise RuntimeError(
+                        "Failed to load tokenizer for '{}': {}. "
+                        "To allow whitespace-tokenizer fallback, set "
+                        "text_encoder.allow_simple_tokenizer_fallback=true in model config."
+                        .format(architecture, inner_exc)
+                    ) from inner_exc
                 LOGGER.warning(
                     "Failed to load tokenizer for '%s' in offline mode (%s). "
-                    "Falling back to SimpleWhitespaceTokenizer.",
+                    "Falling back to SimpleWhitespaceTokenizer "
+                    "(allow_simple_tokenizer_fallback=true).",
                     architecture,
                     inner_exc,
                 )
@@ -277,6 +299,13 @@ class DistilBertTextEncoder(nn.Module):
             try:
                 return DistilBertModel.from_pretrained(self.config.architecture)
             except Exception as exc:
+                if not self.config.allow_random_init_fallback:
+                    raise RuntimeError(
+                        "Failed to load pretrained DistilBERT '{}': {}. "
+                        "To allow random-initialized fallback, set "
+                        "text_encoder.allow_random_init_fallback=true in model config."
+                        .format(self.config.architecture, exc)
+                    ) from exc
                 LOGGER.warning(
                     "Failed to load pretrained DistilBERT '%s' (%s). Falling back to random init.",
                     self.config.architecture,

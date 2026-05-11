@@ -50,6 +50,7 @@ class ResNet50EncoderConfig:
     dtype: str
     normalize_output: bool
     channels_last: bool
+    allow_random_init_fallback: bool
 
 
 def _resolve_resnet_weights(pretrained: bool, weights_name: str | None) -> ResNet50_Weights | None:
@@ -94,6 +95,9 @@ def load_resnet50_encoder_config(config_path: str | Path | None = None) -> ResNe
         dtype=str(model_raw.get("dtype", "float32")),
         normalize_output=bool(image_raw.get("normalize_output", False)),
         channels_last=bool(image_raw.get("channels_last", True)),
+        allow_random_init_fallback=bool(
+            image_raw.get("allow_random_init_fallback", False)
+        ),
     )
     return cfg
 
@@ -118,8 +122,16 @@ class ResNet50ImageEncoder(nn.Module):
         except Exception as exc:
             if weights is None:
                 raise
+            if not self.config.allow_random_init_fallback:
+                raise RuntimeError(
+                    "Failed to load pretrained ResNet-50 weights '{}': {}. "
+                    "To allow random-initialized fallback, set "
+                    "image_encoder.allow_random_init_fallback=true in model config."
+                    .format(self.config.weights, exc)
+                ) from exc
             LOGGER.warning(
-                "Failed to load pretrained weights '%s' (%s). Falling back to random init.",
+                "Failed to load pretrained weights '%s' (%s). Falling back to random init "
+                "(allow_random_init_fallback=true).",
                 self.config.weights,
                 exc,
             )
@@ -149,7 +161,8 @@ class ResNet50ImageEncoder(nn.Module):
 
         LOGGER.info(
             "Initialized ResNet50ImageEncoder | device=%s dtype=%s pretrained=%s weights=%s "
-            "trainable=%s freeze_backbone=%s freeze_until=%s normalize_output=%s channels_last=%s",
+            "trainable=%s freeze_backbone=%s freeze_until=%s normalize_output=%s channels_last=%s "
+            "allow_random_init_fallback=%s",
             self.device_obj,
             self.dtype_obj,
             self.config.pretrained,
@@ -159,6 +172,7 @@ class ResNet50ImageEncoder(nn.Module):
             self.config.freeze_until,
             self.config.normalize_output,
             self.use_channels_last,
+            self.config.allow_random_init_fallback,
         )
 
     def _apply_trainability_controls(self) -> None:

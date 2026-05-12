@@ -6,6 +6,7 @@ from `configs/data.yaml` through `src.utils.config`.
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from functools import lru_cache
 from pathlib import Path
 from typing import Callable
@@ -32,6 +33,19 @@ class EnsureRGB:
         if image.mode != "RGB":
             return image.convert("RGB")
         return image
+
+
+@dataclass(frozen=True)
+class TextPreprocessor:
+    """Pickle-safe text normalizer used by dataset workers."""
+
+    lowercase: bool = True
+
+    def __call__(self, text: str) -> str:
+        out = str(text).strip()
+        if self.lowercase:
+            out = out.lower()
+        return out
 
 
 def _to_interpolation_mode(value: str) -> InterpolationMode:
@@ -102,7 +116,6 @@ def build_train_image_transform(
                     ratio=(0.75, 1.3333),
                     interpolation=interpolation,
                 ),
-                transforms.RandomHorizontalFlip(p=0.0),
                 transforms.RandomApply(
                     [
                         transforms.ColorJitter(
@@ -191,14 +204,7 @@ def build_text_preprocessor(data_cfg: DataConfig | None = None) -> Callable[[str
     cfg = data_cfg or get_data_config()
     lowercase = cfg.text.lowercase
     LOGGER.info("Built text preprocessor | lowercase=%s", lowercase)
-
-    def _preprocess(text: str) -> str:
-        out = str(text).strip()
-        if lowercase:
-            out = out.lower()
-        return out
-
-    return _preprocess
+    return TextPreprocessor(lowercase=lowercase)
 
 
 def get_transform_bundle(

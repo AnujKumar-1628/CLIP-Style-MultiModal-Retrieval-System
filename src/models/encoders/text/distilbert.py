@@ -10,7 +10,6 @@ from __future__ import annotations
 
 import hashlib
 import re
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -21,9 +20,11 @@ from transformers import AutoTokenizer, DistilBertConfig, DistilBertModel, PreTr
 
 from src.data_logic.transforms import build_text_preprocessor, get_data_config
 from src.models.runtime import resolve_device, resolve_dtype
-from src.utils.config import load_yaml
+from src.utils.config import (
+    DistilBertEncoderConfig,
+    load_distilbert_encoder_config as load_distilbert_encoder_config_from_utils,
+)
 from src.utils.logger import setup_logger
-from src.utils.paths import CONFIGS_DIR
 from src.utils.registry import Registry
 
 
@@ -112,25 +113,6 @@ class _SimpleWhitespaceTokenizer:
         }
 
 
-@dataclass(frozen=True)
-class DistilBertEncoderConfig:
-    architecture: str
-    pretrained: bool
-    trainable: bool
-    freeze_backbone: bool
-    freeze_until: str | None
-    out_dim: int
-    dropout: float
-    max_length: int
-    dynamic_padding: bool
-    lowercase: bool
-    device: str
-    dtype: str
-    normalize_output: bool
-    allow_random_init_fallback: bool
-    allow_simple_tokenizer_fallback: bool
-
-
 def _parse_freeze_until_layer(value: str | None) -> int | None:
     """Parse layer-freeze marker.
 
@@ -158,53 +140,10 @@ def load_distilbert_encoder_config(
     data_config_path: str | Path | None = None,
 ) -> DistilBertEncoderConfig:
     """Load text encoder settings from model/data config files."""
-    model_cfg_path = Path(config_path) if config_path is not None else (CONFIGS_DIR / "model.yaml")
-    model_raw = load_yaml(model_cfg_path)
-    data_cfg_path = (
-        Path(data_config_path)
-        if data_config_path is not None
-        else (CONFIGS_DIR / "data.yaml")
+    return load_distilbert_encoder_config_from_utils(
+        model_config_path=config_path,
+        data_config_path=data_config_path,
     )
-    data_raw = load_yaml(data_cfg_path)
-
-    model_section = model_raw.get("model", {})
-    text_raw = model_raw.get("text_encoder", {})
-    data_text_raw = data_raw.get("text", {})
-
-    architecture = str(text_raw.get("architecture", "distilbert-base-uncased")).strip()
-    if "distilbert" not in architecture.lower():
-        raise ValueError(
-            f"This encoder expects a DistilBERT architecture. Got '{architecture}'."
-        )
-
-    if text_raw.get("max_length") is not None:
-        LOGGER.warning(
-            "Ignoring text_encoder.max_length from model config. "
-            "Using text.max_length from data config instead."
-        )
-
-    cfg = DistilBertEncoderConfig(
-        architecture=architecture,
-        pretrained=bool(text_raw.get("pretrained", True)),
-        trainable=bool(text_raw.get("trainable", True)),
-        freeze_backbone=bool(text_raw.get("freeze_backbone", False)),
-        freeze_until=(str(text_raw["freeze_until"]).strip() if text_raw.get("freeze_until") else None),
-        out_dim=int(text_raw.get("out_dim", 768)),
-        dropout=float(text_raw.get("dropout", 0.0)),
-        max_length=int(data_text_raw.get("max_length", 40)),
-        dynamic_padding=bool(data_text_raw.get("dynamic_padding", True)),
-        lowercase=bool(data_text_raw.get("lowercase", True)),
-        device=str(model_section.get("device", "cpu")),
-        dtype=str(model_section.get("dtype", "float32")),
-        normalize_output=bool(text_raw.get("normalize_output", False)),
-        allow_random_init_fallback=bool(
-            text_raw.get("allow_random_init_fallback", False)
-        ),
-        allow_simple_tokenizer_fallback=bool(
-            text_raw.get("allow_simple_tokenizer_fallback", False)
-        ),
-    )
-    return cfg
 
 
 @TEXT_ENCODER_REGISTRY.register("distilbert")

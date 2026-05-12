@@ -6,7 +6,6 @@ features into a shared embedding space.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Literal
 
@@ -15,9 +14,12 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 from src.models.runtime import resolve_device, resolve_dtype
-from src.utils.config import load_yaml
+from src.utils.config import (
+    ProjectionConfigBundle,
+    ProjectionHeadConfig,
+    load_projection_config_bundle as load_projection_config_bundle_from_utils,
+)
 from src.utils.logger import setup_logger
-from src.utils.paths import CONFIGS_DIR
 from src.utils.registry import Registry
 
 LOGGER = setup_logger(
@@ -28,26 +30,6 @@ LOGGER = setup_logger(
 )
 
 PROJECTION_HEAD_REGISTRY: Registry[type[nn.Module]] = Registry("projection_head")
-
-
-@dataclass(frozen=True)
-class ProjectionHeadConfig:
-    input_dim: int
-    hidden_dim: int
-    output_dim: int
-    activation: str
-    dropout: float
-    use_layer_norm: bool
-    normalize_output: bool
-    dtype: str
-    device: str
-
-
-@dataclass(frozen=True)
-class ProjectionConfigBundle:
-    embed_dim: int
-    image: ProjectionHeadConfig
-    text: ProjectionHeadConfig
 
 
 def _build_activation(name: str) -> nn.Module:
@@ -69,53 +51,7 @@ def load_projection_config_bundle(
     config_path: str | Path | None = None,
 ) -> ProjectionConfigBundle:
     """Load projection-head configuration from `configs/model.yaml`."""
-    model_cfg_path = (
-        Path(config_path) if config_path is not None else (CONFIGS_DIR / "model.yaml")
-    )
-    raw = load_yaml(model_cfg_path)
-
-    model_raw = raw.get("model", {})
-    image_encoder_raw = raw.get("image_encoder", {})
-    text_encoder_raw = raw.get("text_encoder", {})
-    proj_raw = raw.get("projection_heads", {})
-    embed_dim = int(proj_raw.get("embed_dim", 256))
-    if embed_dim <= 0:
-        raise ValueError("projection_heads.embed_dim must be > 0.")
-
-    dtype_name = str(model_raw.get("dtype", "float32"))
-    device_name = str(model_raw.get("device", "cpu"))
-
-    image_raw = proj_raw.get("image", {})
-    text_raw = proj_raw.get("text", {})
-
-    image_cfg = ProjectionHeadConfig(
-        input_dim=int(image_encoder_raw.get("out_dim", 2048)),
-        hidden_dim=int(image_raw.get("hidden_dim", 1024)),
-        output_dim=embed_dim,
-        activation=str(image_raw.get("activation", "gelu")),
-        dropout=float(image_raw.get("dropout", 0.0)),
-        use_layer_norm=bool(image_raw.get("use_layer_norm", True)),
-        normalize_output=bool(image_raw.get("normalize_output", False)),
-        dtype=dtype_name,
-        device=device_name,
-    )
-    text_cfg = ProjectionHeadConfig(
-        input_dim=int(text_encoder_raw.get("out_dim", 768)),
-        hidden_dim=int(text_raw.get("hidden_dim", 768)),
-        output_dim=embed_dim,
-        activation=str(text_raw.get("activation", "gelu")),
-        dropout=float(text_raw.get("dropout", 0.0)),
-        use_layer_norm=bool(text_raw.get("use_layer_norm", True)),
-        normalize_output=bool(text_raw.get("normalize_output", False)),
-        dtype=dtype_name,
-        device=device_name,
-    )
-
-    return ProjectionConfigBundle(
-        embed_dim=embed_dim,
-        image=image_cfg,
-        text=text_cfg,
-    )
+    return load_projection_config_bundle_from_utils(config_path)
 
 
 @PROJECTION_HEAD_REGISTRY.register("mlp_projection")

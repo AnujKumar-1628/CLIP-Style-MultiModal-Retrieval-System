@@ -11,7 +11,6 @@ and exposes a clean training/inference API for retrieval tasks.
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -27,9 +26,11 @@ from src.models.projection import (
 )
 from src.models.encoders.text.distilbert import DistilBertTextEncoder
 from src.models.runtime import resolve_device, resolve_dtype
-from src.utils.config import load_yaml
+from src.utils.config import (
+    CLIPModelConfig,
+    load_clip_model_config as load_clip_model_config_from_utils,
+)
 from src.utils.logger import setup_logger
-from src.utils.paths import CONFIGS_DIR
 from src.utils.registry import Registry
 
 LOGGER = setup_logger(
@@ -42,48 +43,9 @@ LOGGER = setup_logger(
 CLIP_MODEL_REGISTRY: Registry[type[nn.Module]] = Registry("clip_model")
 
 
-@dataclass(frozen=True)
-class CLIPModelConfig:
-    model_name: str
-    device: str
-    dtype: str
-    normalize_embeddings: bool
-    logit_scale_init_value: float
-    logit_scale_learnable: bool
-    logit_scale_clamp_min: float
-    logit_scale_clamp_max: float
-
-
 def load_clip_model_config(config_path: str | Path | None = None) -> CLIPModelConfig:
     """Load model-level CLIP settings from `configs/model.yaml`."""
-    model_cfg_path = (
-        Path(config_path) if config_path is not None else (CONFIGS_DIR / "model.yaml")
-    )
-    raw = load_yaml(model_cfg_path)
-
-    model_raw = raw.get("model", {})
-    similarity_raw = raw.get("similarity", {})
-    logit_scale_raw = similarity_raw.get("logit_scale", {})
-
-    init_value = float(logit_scale_raw.get("init_value", 0.07))
-    if init_value <= 0:
-        raise ValueError("similarity.logit_scale.init_value must be > 0.")
-
-    cfg = CLIPModelConfig(
-        model_name=str(model_raw.get("name", "clip_style_retrieval")),
-        device=str(model_raw.get("device", "cpu")),
-        dtype=str(model_raw.get("dtype", "float32")),
-        normalize_embeddings=bool(similarity_raw.get("normalize_embeddings", True)),
-        logit_scale_init_value=init_value,
-        logit_scale_learnable=bool(logit_scale_raw.get("learnable", True)),
-        logit_scale_clamp_min=float(logit_scale_raw.get("clamp_min", 0.001)),
-        logit_scale_clamp_max=float(logit_scale_raw.get("clamp_max", 100.0)),
-    )
-    if cfg.logit_scale_clamp_min <= 0 or cfg.logit_scale_clamp_max <= 0:
-        raise ValueError("logit scale clamp values must be > 0.")
-    if cfg.logit_scale_clamp_min >= cfg.logit_scale_clamp_max:
-        raise ValueError("logit_scale.clamp_min must be < logit_scale.clamp_max.")
-    return cfg
+    return load_clip_model_config_from_utils(config_path)
 
 
 @CLIP_MODEL_REGISTRY.register("clip_style_retrieval")

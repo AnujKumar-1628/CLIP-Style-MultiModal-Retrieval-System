@@ -8,7 +8,6 @@ Design goals:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
@@ -20,9 +19,11 @@ from torchvision.models import ResNet50_Weights, resnet50
 
 from src.data_logic.transforms import build_eval_image_transform, get_data_config
 from src.models.runtime import resolve_device, resolve_dtype
-from src.utils.config import load_yaml
+from src.utils.config import (
+    ResNet50EncoderConfig,
+    load_resnet50_encoder_config as load_resnet50_encoder_config_from_utils,
+)
 from src.utils.logger import setup_logger
-from src.utils.paths import CONFIGS_DIR
 from src.utils.registry import Registry
 
 
@@ -34,23 +35,6 @@ LOGGER = setup_logger(
 )
 
 IMAGE_ENCODER_REGISTRY: Registry[type[nn.Module]] = Registry("image_encoder")
-
-
-@dataclass(frozen=True)
-class ResNet50EncoderConfig:
-    architecture: str
-    pretrained: bool
-    weights: str | None
-    trainable: bool
-    freeze_backbone: bool
-    freeze_until: str | None
-    out_dim: int
-    dropout: float
-    device: str
-    dtype: str
-    normalize_output: bool
-    channels_last: bool
-    allow_random_init_fallback: bool
 
 
 def _resolve_resnet_weights(pretrained: bool, weights_name: str | None) -> ResNet50_Weights | None:
@@ -69,37 +53,7 @@ def _resolve_resnet_weights(pretrained: bool, weights_name: str | None) -> ResNe
 
 def load_resnet50_encoder_config(config_path: str | Path | None = None) -> ResNet50EncoderConfig:
     """Load encoder settings from model config."""
-    model_cfg_path = Path(config_path) if config_path is not None else (CONFIGS_DIR / "model.yaml")
-    raw = load_yaml(model_cfg_path)
-
-    model_raw = raw.get("model", {})
-    image_raw = raw.get("image_encoder", {})
-    architecture = str(image_raw.get("architecture", "resnet50")).strip().lower()
-    if architecture != "resnet50":
-        raise ValueError(
-            f"This encoder only supports architecture='resnet50'. Got '{architecture}'."
-        )
-
-    cfg = ResNet50EncoderConfig(
-        architecture=architecture,
-        pretrained=bool(image_raw.get("pretrained", True)),
-        weights=image_raw.get("weights"),
-        trainable=bool(image_raw.get("trainable", True)),
-        freeze_backbone=bool(image_raw.get("freeze_backbone", False)),
-        freeze_until=(
-            str(image_raw["freeze_until"]).strip() if image_raw.get("freeze_until") else None
-        ),
-        out_dim=int(image_raw.get("out_dim", 2048)),
-        dropout=float(image_raw.get("dropout", 0.0)),
-        device=str(model_raw.get("device", "cpu")),
-        dtype=str(model_raw.get("dtype", "float32")),
-        normalize_output=bool(image_raw.get("normalize_output", False)),
-        channels_last=bool(image_raw.get("channels_last", True)),
-        allow_random_init_fallback=bool(
-            image_raw.get("allow_random_init_fallback", False)
-        ),
-    )
-    return cfg
+    return load_resnet50_encoder_config_from_utils(config_path)
 
 
 @IMAGE_ENCODER_REGISTRY.register("resnet50")

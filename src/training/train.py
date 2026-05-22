@@ -153,15 +153,12 @@ def _build_callbacks(
     data_config_path: str | Path | None = None,
 ) -> list:
     callbacks: list = []
-    callbacks.insert(
-        0,
-        build_backbone_unfreeze_callback(
-            unfreeze_at_epoch=4,
-            backbone_lr=1e-5,
-            model_config_path=model_config_path,
-            data_config_path=data_config_path,
-        ),
+    backbone_unfreeze_cb = build_backbone_unfreeze_callback(
+        model_config_path=model_config_path,
+        data_config_path=data_config_path,
     )
+    if backbone_unfreeze_cb is not None:
+        callbacks.insert(0, backbone_unfreeze_cb)
 
     if cfg.checkpoint.enabled:
         if cfg.checkpoint.dir:

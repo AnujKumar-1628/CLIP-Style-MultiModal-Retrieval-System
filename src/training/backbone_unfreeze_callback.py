@@ -7,6 +7,7 @@ from typing import Any
 
 from src.training.callbacks import Callback
 from src.utils.config import (
+    load_backbone_unfreeze_config,
     load_resnet50_encoder_config,
     load_distilbert_encoder_config,
 )
@@ -82,6 +83,7 @@ class BackboneUnfreezeCallback(Callback):
             old_lrs = [group.get("lr", None) for group in optimizer.param_groups]
             for group in optimizer.param_groups:
                 group["lr"] = self.backbone_lr
+            self._sync_scheduler_lrs(trainer)
             LOGGER.info(
                 "Learning rates updated for all parameter groups: %s -> %.2e",
                 old_lrs,
@@ -103,6 +105,17 @@ class BackboneUnfreezeCallback(Callback):
                 return candidate
         return None
 
+    def _sync_scheduler_lrs(self, trainer: Any) -> None:
+        scheduler = getattr(trainer, "scheduler", None)
+        if scheduler is None:
+            return
+        base_lrs = getattr(scheduler, "base_lrs", None)
+        if not isinstance(base_lrs, list):
+            return
+        scheduler.base_lrs = [self.backbone_lr for _ in base_lrs]
+        if hasattr(scheduler, "_last_lr"):
+            scheduler._last_lr = [self.backbone_lr for _ in base_lrs]
+
     def __repr__(self) -> str:
         return (
             "BackboneUnfreezeCallback("
@@ -113,18 +126,20 @@ class BackboneUnfreezeCallback(Callback):
 
 def build_backbone_unfreeze_callback(
     *,
-    unfreeze_at_epoch: int = 4,
-    backbone_lr: float = 1e-5,
     model_config_path: str | Path | None = None,
     data_config_path: str | Path | None = None,
-) -> BackboneUnfreezeCallback:
+) -> BackboneUnfreezeCallback | None:
     """Factory helper to keep callback wiring in train.py concise."""
+    schedule_cfg = load_backbone_unfreeze_config(model_config_path)
+    if not schedule_cfg.enabled:
+        return None
+
     resnet_cfg = load_resnet50_encoder_config(model_config_path)
     distilbert_cfg = load_distilbert_encoder_config(model_config_path, data_config_path)
 
     return BackboneUnfreezeCallback(
-        unfreeze_at_epoch=unfreeze_at_epoch,
-        backbone_lr=backbone_lr,
+        unfreeze_at_epoch=schedule_cfg.at_epoch,
+        backbone_lr=schedule_cfg.lr,
         image_unfreeze_layers=resnet_cfg.unfreeze_layers,
         text_unfreeze_layers=distilbert_cfg.unfreeze_layers,
     )

@@ -117,6 +117,7 @@ class CLIPDataModule(BaseDataModule):
                 tokenize_in_dataset=tokenize_in_dataset,
                 fail_on_missing_image=fail_on_missing_image,
                 force_rebuild_splits=False,
+                one_caption_per_image=self.data_cfg.datamodule.val_one_caption_per_image,
             )
 
         if stage_normalized in (None, "fit", "validate", "val") and self.val_dataset is None:
@@ -127,6 +128,7 @@ class CLIPDataModule(BaseDataModule):
                 tokenize_in_dataset=tokenize_in_dataset,
                 fail_on_missing_image=fail_on_missing_image,
                 force_rebuild_splits=force_rebuild,
+                one_caption_per_image=self.data_cfg.datamodule.val_one_caption_per_image,
             )
 
         if stage_normalized in (None, "test"):
@@ -137,6 +139,7 @@ class CLIPDataModule(BaseDataModule):
                 tokenize_in_dataset=tokenize_in_dataset,
                 fail_on_missing_image=fail_on_missing_image,
                 force_rebuild_splits=False,
+                one_caption_per_image=self.data_cfg.datamodule.test_one_caption_per_image,
             )
 
         if stage_normalized in ("predict",) and self.test_dataset is None:
@@ -147,6 +150,7 @@ class CLIPDataModule(BaseDataModule):
                 tokenize_in_dataset=tokenize_in_dataset,
                 fail_on_missing_image=fail_on_missing_image,
                 force_rebuild_splits=False,
+                one_caption_per_image=self.data_cfg.datamodule.test_one_caption_per_image,
             )
 
         collator_tokenizer = tokenizer if self.data_cfg.datamodule.use_tokenizer_in_collate else None

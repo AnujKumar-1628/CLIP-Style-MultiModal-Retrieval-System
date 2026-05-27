@@ -1,0 +1,45 @@
+optimizer:
+  lr: 0.00008
+  weight_decay: 0.03
+  betas: [0.9, 0.999]
+  eps: 0.00000001
+
+scheduler:
+  name: cosine
+  step_on: step
+  warmup_steps: 100
+  min_lr_ratio: 0.1
+  plateau_factor: 0.5
+  plateau_patience: 2
+
+runtime:
+  seed: 42
+  deterministic: true
+  epochs: 15
+  use_amp: true
+  grad_accumulation_steps: 2
+  grad_clip_norm: 1.0
+  log_every_n_steps: 20
+  resume_from: null
+
+checkpoint:
+  enabled: true
+  save_last: true
+  save_best: true
+  save_every_n_epochs: 1
+  max_to_keep: 3
+  monitor: val/loss
+  mode: min
+  filename_prefix: clip
+  dir: artifacts/checkpoints
+
+early_stopping:
+  enabled: true
+  monitor: val/loss
+  mode: min
+  patience: 5
+  min_delta: 0.001
+
+experiment_logging:
+  backend: none
+  run_name: default

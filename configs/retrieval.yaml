@@ -1,0 +1,58 @@
+embed:
+  use_amp: true
+  normalize: true
+  image_batch_size: 256
+  text_batch_size: 512
+
+index:
+  backend: flat          # flat | ivfpq | ivfsq
+  metric: cosine         # cosine | ip | l2
+  nlist: 4096
+  nprobe: 32
+  pq_m: 64
+  pq_nbits: 8
+  sq_qtype: 8bit
+  train_sample_size: 200000
+
+storage:
+  embeddings_dir: artifacts/embeddings
+  index_dir: artifacts/indices
+  metadata_dir: artifacts/metadata
+  use_mmap: true
+  embedding_dtype: float32
+
+search:
+  default_top_k: 10
+  max_top_k: 100
+  return_metadata: true
+
+reranker:
+  enabled: false
+  name: none              # none | blend | mmr
+  candidate_multiplier: 5
+  max_candidates: 200
+  blend_alpha: 0.5
+  mmr_lambda: 0.7
+
+serving:
+  host: 0.0.0.0
+  port: 8001
+  route: /api/search
+
+runtime:
+  split: test
+  directions: [text_to_image, image_to_text]
+  ks: [1, 5, 10]
+  similarity_chunk_size: 1024
+  use_amp: true
+
+checkpoint:
+  path: artifacts/checkpoints/clip_best.pt
+  strict: true
+  state_dict_key: model_state_dict
+
+output:
+  save_json: true
+  output_dir: artifacts/metadata
+  filename: retrieval_eval.json
+  include_per_query: true

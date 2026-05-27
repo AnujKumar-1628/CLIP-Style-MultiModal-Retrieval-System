@@ -1,0 +1,64 @@
+model:
+  name: "clip_style_retrieval"
+  device: "cuda"
+  dtype: "float32"
+
+training:
+  backbone_unfreeze:
+    enabled: true
+    at_epoch: 4
+    lr: 0.00001
+
+image_encoder:
+  architecture: "resnet50"
+  source: "torchvision"
+  pretrained: true
+  weights: "IMAGENET1K_V2"
+  trainable: true
+  freeze_backbone: true
+  freeze_until: "layer4"
+  unfreeze_layers:
+    - "layer4"
+    - "avgpool"
+  allow_random_init_fallback: false
+  out_dim: 2048
+  dropout: 0.0
+
+text_encoder:
+  architecture: "distilbert-base-uncased"
+  source: "transformers"
+  pretrained: true
+  trainable: true
+  freeze_backbone: true
+  unfreeze_layers:
+    - "layer.3"
+    - "layer.4"
+    - "layer.5"
+  allow_random_init_fallback: false
+  allow_simple_tokenizer_fallback: false
+  out_dim: 768
+
+projection_heads:
+  embed_dim: 256
+  image:
+    hidden_dim: 1024
+    activation: "gelu"
+    dropout: 0.3
+    use_layer_norm: true
+  text:
+    hidden_dim: 768
+    activation: "gelu"
+    dropout: 0.3
+    use_layer_norm: true
+
+similarity:
+  normalize_embeddings: true
+  logit_scale:
+    init_value: 0.07
+    learnable: true
+    clamp_min: 0.001
+    clamp_max: 100.0
+
+loss:
+  name: "symmetric_info_nce"
+  label_smoothing: 0.05

@@ -1,0 +1,51 @@
+dataset:
+  name: flickr30k
+  captions_file: /content/local_data/data/raw/captions.txt
+  images_dir: /content/local_data/data/raw/flickr30k_images
+
+split:
+  strategy: by_image_id
+  train_ratio: 0.92
+  val_ratio: 0.04
+  test_ratio: 0.04
+  seed: 42
+  output_dir: data/splits
+  train_filename: train.csv
+  val_filename: val.csv
+  test_filename: test.csv
+  random_one_caption_per_image: true
+
+image:
+  size: 224
+  interpolation: bicubic
+  normalize_mean: [0.485, 0.456, 0.406]
+  normalize_std: [0.229, 0.224, 0.225]
+
+text:
+  tokenizer_name: distilbert-base-uncased
+  max_length: 40
+  dynamic_padding: true
+  lowercase: true
+
+loader:
+  batch_size: 256
+  num_workers: 8
+  pin_memory: true
+  persistent_workers: true
+  drop_last: false
+
+datamodule:
+  force_rebuild_splits: false
+  fail_on_missing_image: true
+  tokenize_in_dataset: false
+  use_tokenizer_in_collate: true
+  use_train_augmentations: true
+  use_unique_image_batch_sampler: false
+  distributed: false
+  distributed_num_replicas: null
+  distributed_rank: null
+  eval_default_split: test
+  eval_query_one_caption_per_image: false
+  eval_gallery_one_caption_per_image: true
+  val_one_caption_per_image: true
+  test_one_caption_per_image: false

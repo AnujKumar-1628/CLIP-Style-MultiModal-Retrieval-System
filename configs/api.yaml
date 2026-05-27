@@ -1,0 +1,19 @@
+app:
+  title: "CLIP Retrieval API"
+  version: "0.1.0"
+
+server:
+  host: "0.0.0.0"
+  port: 8001
+  root_path: ""
+  docs_url: "/docs"
+  redoc_url: "/redoc"
+
+paths:
+  retrieval_config: "configs/retrieval.yaml"
+  model_config: "configs/model.yaml"
+  data_config: "configs/data.yaml"
+
+index:
+  image_index_name: "image_index"
+  text_index_name: "text_index"

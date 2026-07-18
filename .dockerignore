@@ -1,0 +1,17 @@
+.git
+.gitignore
+.env
+.pytest_cache
+.pytest_tmp
+__pycache__
+*.py[cod]
+*.egg-info
+
+artifacts
+data
+experiments
+notebooks
+tests
+
+README.md
+template.py

@@ -1,0 +1,23 @@
+# Core ML
+torch==2.11.0
+torchvision==0.26.0
+transformers==5.5.3
+tokenizers==0.22.2
+huggingface_hub==1.10.1
+numpy==2.4.4
+pandas==3.0.2
+pyyaml==6.0.3
+pillow==11.3.0
+nltk==3.9.4
+
+# Visualization / analysis
+matplotlib==3.10.8
+seaborn==0.13.2
+
+# experiment tracking backend used by Trainer(TensorBoardExperimentLogger)
+tensorboard==2.20.0
+
+# retrieval ANN backends and serving
+faiss-cpu==1.13.2
+fastapi==0.136.1
+uvicorn==0.46.0
